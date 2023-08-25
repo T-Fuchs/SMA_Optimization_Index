@@ -105,9 +105,10 @@ c_gradient_poly[0][1]=0.4
 
 process.add_event('load', 'flow_sheet.inlet.c', c_load)
 process.add_event('wash', 'flow_sheet.inlet.c',  c_wash, load_duration)
-process.add_event('grad_start', 'flow_sheet.inlet.c', c_gradient_poly, t_gradient_start)
+process.add_event('grad_start', 'flow_sheet.inlet.c', c_gradient_poly[0][1],indices=(0,1), time=t_gradient_start)
+print(inlet.c)
 process.add_event('Flush','flow_sheet.inlet.c',c_elute,t_gradient_start+gradient_duration)
-
+#print(inlet.c)
 #
 from CADETProcess.simulator import Cadet
 process_simulator = Cadet(install_path=Path.home() / "Cadet" / "cadet"/"bin"/"cadet-cli.exe")
@@ -119,21 +120,26 @@ sec = SecondaryAxis()
 sec.components = ['Salt']
 sec.y_label = '$c_{salt}$'
 _=simulation_results.solution.column.outlet.plot(secondary_axis=sec)
-#
+
+
 from CADETProcess.fractionation import FractionationOptimizer
 fractionation_optimizer = FractionationOptimizer()
 fractionator = fractionation_optimizer.optimize_fractionation(simulation_results, components=[Prot_1,Prot_2,Prot_3], purity_required=[0.85,0., 0.])
 #
 
 _ = fractionator.plot_fraction_signal()
+print(fractionator.performance)
 
-
-#
+#%%
 from CADETProcess.optimization import OptimizationProblem
-optimization_problem = OptimizationProblem('SMA')
+optimization_problem = OptimizationProblem('SMA', use_diskcache=False)
+
 optimization_problem.add_evaluation_object(process)
 
-optimization_problem.add_variable('grad_start.state',component_index=0,polynomial_index=1, lb=0.1, ub=0.4)
+var=optimization_problem.add_variable('Gradient_Slope',parameter_path='grad_start.state',lb=0.1, ub=0.4)
+var.value=0.2#c_gradient_poly[0][1]
+print(inlet.c)
+
 #optimization_problem.add_variable('flow_sheet.inlet.c', lb=0.1, ub=0.3)
 #optimization_problem.add_variable('feed_duration.time', lb=10, ub=300)
 process_simulator.evaluate_stationarity = False#True
@@ -166,14 +172,24 @@ performance = Mass(ranking=ranking)
 optimization_problem.add_objective(
     performance, requires=[process_simulator, fractionation_optimizer]
 )
-print(fractionator.performance)
-print(optimization_problem.evaluate_objectives([0.1870]))
+
+#print(c_gradient_poly[0][1])
+#print(' führt zu: ')
+#print(fractionator.performance)
+var.value=0.3
+print('0.3 führt zu: ')
+print(optimization_problem.evaluate_objectives([0.3],True))
+var.value=0.15
+print('0.15 führt zu: ')
+print(optimization_problem.evaluate_objectives([0.15],True))
+"""print('0.4 führt zu: ')
 print(optimization_problem.evaluate_objectives([0.40]))
-print(optimization_problem.evaluate_objectives([0.10]))
+print('0.1 führt zu: ')
+print(optimization_problem.evaluate_objectives([0.10]))"""
 from CADETProcess.optimization import U_NSGA3
 optimizer = U_NSGA3()
-optimizer.n_max_gen=5
-optimizer.pop_size=20
+optimizer.n_max_gen=3
+optimizer.pop_size=10
 """
 """
 
